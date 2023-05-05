@@ -1,0 +1,44 @@
+FROM ruby:3.2-bullseye
+
+ARG BASE_CONTAINER_VERSION
+ARG LAST_BUILD_DATE
+
+RUN apt-get update && \
+  apt-get -y install curl git openssh-client openssl nodejs awscli libmariadb-dev && \
+  # Install jemalloc to reduce memory consumption for multi-threaded processes
+  apt-get install -y --no-install-recommends libjemalloc-dev && \
+  rm -rf /var/lib/apt/lists/*
+
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
+
+ENV BASE_CONTAINER_VERSION $BASE_CONTAINER_VERSION
+ENV LAST_BUILD_DATE $LAST_BUILD_DATE
+
+RUN mkdir -p /var/certs
+
+# COPY platform-param-decrypt_linux /usr/local/bin/platform-param-decrypt_linux
+
+# Update rubygems to the latest stable version
+RUN gem update --system 3.4.7
+
+# Rubygems config for Artifactory
+# COPY .gemrc /root/.gemrc
+
+# # Bundler config for Artifactory
+# COPY bundleConfig /root/.bundle/config
+
+# # NPM credential for Artifactory (some Rails apps require Node)
+# COPY .npmrc /root/.npmrc
+
+# COPY platform-container-startup.sh /var/scripts/platform-container-startup.sh
+# RUN chmod +x /var/scripts/platform-container-startup.sh
+
+# Hack to get around the updates from OpenSSL to 1.1.1
+# TODO: Remove this patch after OpenSSL issues have been resolved in the base image
+RUN sed -i 's/MinProtocol = TLSv1.2/MinProtocol = None/g' /etc/ssl/openssl.cnf
+RUN sed -i 's/CipherString = DEFAULT@SECLEVEL=2/CipherString = DEFAULT/g' /etc/ssl/openssl.cnf
+
+# Enable ruby YJIT, if available
+ENV RUBY_YJIT_ENABLE 1
+
+# ENTRYPOINT ["/var/scripts/platform-container-startup.sh"]
